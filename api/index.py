@@ -14,7 +14,6 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
-from starlette.routing import Route
 
 from perplexity.config import MODEL_MAPPINGS
 from perplexity.exceptions import AuthenticationError, RateLimitError
@@ -208,32 +207,36 @@ async def health(request: Request):
 
 
 api_app = Starlette(routes=[
-    Route("/api/v1/models", list_models, methods=["GET", "HEAD"]),
-    Route("/api/v1/chat/completions", chat_completions, methods=["POST"]),
-    Route("/api/v1/health", health, methods=["GET", "HEAD"]),
+    __import__("starlette.routing", fromlist=["Route"]).Route("/api/v1/models", list_models, methods=["GET", "HEAD"]),
+    __import__("starlette.routing", fromlist=["Route"]).Route("/api/v1/chat/completions", chat_completions, methods=["POST"]),
+    __import__("starlette.routing", fromlist=["Route"]).Route("/api/v1/health", health, methods=["GET", "HEAD"]),
 ])
 
 
-async def app(scope, receive, send):
-    if scope["type"] == "http":
-        path = scope.get("path", "")
-        if path.startswith("/api/v1/"):
-            await api_app(scope, receive, send)
-            return
-        if path == "/api" or path.startswith("/api/"):
-            headers = {key.lower(): value for key, value in scope.get("headers", [])}
-            expected = os.environ.get("PERPLEXITY_API_KEY")
-            authorization = headers.get(b"authorization", b"").decode("latin-1")
-            scheme, separator, supplied = authorization.partition(" ")
-            valid = bool(expected and separator and scheme.lower() == "bearer"
-                         and hmac.compare_digest(supplied.strip(), expected))
-            if not expected:
-                response = JSONResponse({"error": "PERPLEXITY_API_KEY is missing."}, status_code=503)
-                await response(scope, receive, send)
+class CombinedApp:
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            if path.startswith("/api/v1/"):
+                await api_app(scope, receive, send)
                 return
-            if not valid:
-                response = JSONResponse({"error": "Invalid or missing API key."}, status_code=401,
-                                        headers={"WWW-Authenticate": "Bearer"})
-                await response(scope, receive, send)
-                return
-    await mcp_app(scope, receive, send)
+            if path == "/api" or path.startswith("/api/"):
+                headers = {key.lower(): value for key, value in scope.get("headers", [])}
+                expected = os.environ.get("PERPLEXITY_API_KEY")
+                authorization = headers.get(b"authorization", b"").decode("latin-1")
+                scheme, separator, supplied = authorization.partition(" ")
+                valid = bool(expected and separator and scheme.lower() == "bearer"
+                             and hmac.compare_digest(supplied.strip(), expected))
+                if not expected:
+                    response = JSONResponse({"error": "PERPLEXITY_API_KEY is missing."}, status_code=503)
+                    await response(scope, receive, send)
+                    return
+                if not valid:
+                    response = JSONResponse({"error": "Invalid or missing API key."}, status_code=401,
+                                            headers={"WWW-Authenticate": "Bearer"})
+                    await response(scope, receive, send)
+                    return
+        await mcp_app(scope, receive, send)
+
+
+app = CombinedApp()
