@@ -24,6 +24,18 @@ logger = logging.getLogger("perplexity.api")
 if perplexity_mcp is None:
     raise RuntimeError("The MCP dependency is not installed")
 
+# curl_cffi's Cookies constructor expects an iterable of (name, value) pairs.
+# The project stores PERPLEXITY_COOKIES as a JSON object, so normalize it before
+# the upstream Client receives it. The values remain process-local and secret.
+_cookie_env = os.environ.get("PERPLEXITY_COOKIES")
+if _cookie_env:
+    try:
+        _cookie_data = json.loads(_cookie_env)
+        if isinstance(_cookie_data, dict):
+            os.environ["PERPLEXITY_COOKIES"] = json.dumps(list(_cookie_data.items()))
+    except json.JSONDecodeError:
+        pass
+
 perplexity_client = _get_client()
 _register_tools(perplexity_mcp, authenticated=perplexity_client.own)
 mcp_app = perplexity_mcp.streamable_http_app(
