@@ -23,10 +23,10 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-
 dependencies = [
     "curl_cffi>=0.5.7",
     "websocket-client>=1.9.0",
+    "mcp>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -48,7 +48,6 @@ dev = [
     "isort>=5.12.0",
     "bandit>=1.7.0",
     "pylint>=3.0.0",
-    "mcp>=1.0.0",
 ]
 all = [
     "perplexity-api[driver,mcp,dev]",
@@ -89,7 +88,6 @@ warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
 check_untyped_defs = false
-
 [[tool.mypy.overrides]]
 module = [
     "perplexity.config",
