@@ -51,6 +51,35 @@ research_manager: Optional[ResearchJobManager] = None
 _research_manager_lock = threading.Lock()
 
 
+def _normalize_cookies(cookies: Any) -> list[tuple[str, str]]:
+    """Normalize supported cookie representations to curl_cffi cookie pairs."""
+    pairs: list[tuple[str, str]] = []
+    if isinstance(cookies, dict):
+        items = cookies.items()
+    elif isinstance(cookies, str):
+        raw = cookies.strip()
+        if raw.lower().startswith("cookie:"):
+            raw = raw.split(":", 1)[1]
+        items = (part.strip().split("=", 1) for part in raw.split(";") if "=" in part)
+    elif isinstance(cookies, (list, tuple)):
+        items = cookies
+    else:
+        return pairs
+
+    for item in items:
+        if isinstance(item, dict):
+            name, value = item.get("name"), item.get("value")
+        elif isinstance(item, (list, tuple)) and len(item) == 2:
+            name, value = item
+        elif isinstance(item, str) and "=" in item:
+            name, value = item.split("=", 1)
+        else:
+            continue
+        if name is not None and value is not None and str(name).strip():
+            pairs.append((str(name).strip(), str(value).strip()))
+    return pairs
+
+
 def _get_client() -> Client:
     """Lazily initialize and return the global Client instance."""
     global client
@@ -63,7 +92,7 @@ def _get_client() -> Client:
             except json.JSONDecodeError:
                 logger.error("PERPLEXITY_COOKIES is not valid JSON.")
         # curl_cffi expects cookie pairs rather than a plain dict mapping.
-        client = Client(list(cookies.items()) if isinstance(cookies, dict) else cookies)
+        client = Client(_normalize_cookies(cookies))
     return client
 
 
