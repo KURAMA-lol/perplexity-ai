@@ -62,7 +62,8 @@ def _get_client() -> Client:
                 cookies = json.loads(cookies_env)
             except json.JSONDecodeError:
                 logger.error("PERPLEXITY_COOKIES is not valid JSON.")
-        client = Client(cookies)
+        # curl_cffi expects cookie pairs rather than a plain dict mapping.
+        client = Client(list(cookies.items()) if isinstance(cookies, dict) else cookies)
     return client
 
 
