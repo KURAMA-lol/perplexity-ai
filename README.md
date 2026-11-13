@@ -1,6 +1,6 @@
-# Gemini OpenAI-Compatible API
+# Perplexity OpenAI-Compatible API
 
-A small authenticated proxy that exposes the existing Gemini WebAPI service through an OpenAI-compatible API. No Perplexity client, Perplexity cookies, or MCP server is included.
+A small authenticated REST wrapper around the Perplexity web client. Authentication to Perplexity uses the private `PERPLEXITY_COOKIES` environment variable. The public API uses a separate `PERPLEXITY_API_KEY`.
 
 ## Endpoints
 
@@ -8,30 +8,18 @@ A small authenticated proxy that exposes the existing Gemini WebAPI service thro
 - `POST /api/v1/chat/completions`
 - `GET /api/v1/health`
 
-## Client configuration
+## Client
 
 - Base URL: `https://perplexity-ai-dazzmeh-7432.vercel.app/api/v1`
-- Chat completions: `/chat/completions`
-- Models: `/models`
-- Authentication: `Authorization: Bearer <API_KEY>`
-- Default model: `gemini-auto`
+- Authentication: `Authorization: Bearer <PERPLEXITY_API_KEY>`
+- Default model: `perplexity`
 
-Example request:
+## Perplexity session
 
-```json
-{
-  "model": "gemini-auto",
-  "messages": [{"role": "user", "content": "Hello!"}],
-  "stream": false
-}
-```
+Set `PERPLEXITY_COOKIES` in Vercel Production. Supported formats are a JSON object, JSON list of cookie pairs/objects, a browser Cookie header string, or a Netscape cookie export. Cookie contents are never returned by the API.
 
-The proxy forwards chat requests, streaming, and tool definitions to the configured Gemini WebAPI stateless endpoint. OpenAI sampling/format controls unsupported by Gemini WebAPI are ignored for client compatibility.
+## Models
 
-## Vercel environment variables
+Aliases include `perplexity`/`auto`, `pro`, `reasoning`, and `deep-research`. Specific IDs are listed by `GET /api/v1/models`.
 
-- `PERPLEXITY_API_KEY`: existing client-facing Bearer key (kept to avoid breaking clients).
-- `GEMINI_UPSTREAM_BASE_URL`: upstream base URL; defaults to the Daz WebAI-to-API stateless endpoint.
-- `GEMINI_UPSTREAM_API_KEY`: private upstream service key. Never put it in client apps or source control.
-
-The upstream key is sent only from the Vercel server to the Gemini service.
+This uses Perplexity's web interface and browser session cookies, not the official Perplexity API. It is unofficial and may break when the website changes. Tool/function calling is not supported by the underlying web client.
