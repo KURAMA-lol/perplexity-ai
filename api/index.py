@@ -161,6 +161,12 @@ async def chat_completions(request: Request):
                             current = _extract_answer(chunk)
                             if not current:
                                 continue
+                            if current.strip().lower() in {"sign up and repeat your request", "sign up and repeat your request."}:
+                                failure = {"error": {"message": "Perplexity session is not authenticated. Refresh PERPLEXITY_COOKIES.",
+                                                     "type": "authentication_error", "code": "provider_authentication_failed"}}
+                                yield "data: " + json.dumps(failure) + "\\n\\n"
+                                yield "data: [DONE]\\n\\n"
+                                return
                             delta = current[len(previous):] if current.startswith(previous) else current
                             previous = current
                             if delta:
@@ -196,6 +202,9 @@ async def chat_completions(request: Request):
         except Exception as exc:
             logger.warning("Provider request failed (%s)", exc.__class__.__name__)
             return _error("Perplexity request failed.", "server_error", "provider_error", 502)
+        if answer.strip().lower() in {"sign up and repeat your request", "sign up and repeat your request."}:
+            return _error("Perplexity session is not authenticated. Refresh PERPLEXITY_COOKIES.",
+                          "authentication_error", "provider_authentication_failed", 502)
         if not answer:
             return _error("Perplexity returned an empty answer.", "server_error",
                           "empty_provider_response", 502)
