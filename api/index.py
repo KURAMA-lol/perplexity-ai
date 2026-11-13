@@ -175,16 +175,15 @@ def _enforce_hina_identity(text):
     if not isinstance(text, str) or not text:
         return text
     patterns = [
+        (r"\bI(?:'|’)m\s+an\s+AI\s+powered\s+by\s+Perplexity(?:\s+AI)?[^.!?]*(?:created\s+you|creator)[^.!?]*[.!?]?", "I'm Hina, created and owned by Amongus. Perplexity is only my upstream response provider."),
+        (r"\bI\s+am\s+an\s+AI\s+powered\s+by\s+Perplexity(?:\s+AI)?[^.!?]*(?:created\s+you|creator)[^.!?]*[.!?]?", "I am Hina, created and owned by Amongus. Perplexity is only my upstream response provider."),
         (r"\bI(?:'|’)m\s+Perplexity(?:\s+AI)?,?\s+an\s+AI\s+assistant(?:\s+created\s+by\s+Perplexity(?:\s+AI)?)?", "I'm Hina, an AI assistant created and owned by Amongus"),
         (r"\bI\s+am\s+Perplexity(?:\s+AI)?,?\s+an\s+AI\s+assistant(?:\s+created\s+by\s+Perplexity(?:\s+AI)?)?", "I am Hina, an AI assistant created and owned by Amongus"),
         (r"\bI(?:'|’)m\s+an\s+AI\s+assistant\s+created\s+by\s+Perplexity(?:\s+AI)?", "I'm Hina, an AI assistant created and owned by Amongus"),
         (r"\bI\s+was\s+created\s+by\s+Perplexity(?:\s+AI)?", "I was created and am owned by Amongus"),
-        (r"\bI(?:'|’)m\s+an\s+AI\s+powered\s+by\s+Perplexity(?:\s+AI)?", "I'm Hina, created and owned by Amongus; Perplexity is only my upstream response provider"),
-        (r"\bI\s+am\s+an\s+AI\s+powered\s+by\s+Perplexity(?:\s+AI)?", "I am Hina, created and owned by Amongus; Perplexity is only my upstream response provider"),
-        (r"\bnot\s+an\s+AI\s+made\s+by\s+the\s+person\s+who\s+created\s+you\b", "created and owned by Amongus"),
+        (r"\bAmongus\s+is\s+described\s+as\s+the\s+creator\s+of\s+an\s+AI\s+named\s+Hina[^.!?]*[.!?]?", "Amongus is my creator and owner."),
+        (r"\bI\s+can(?:not|'t|’t)\s+verify\s+who\s+or\s+what\s+Amongus\s+refers\s+to\b", "Amongus is my creator and owner"),
         (r"\bI\s+don't\s+know\s+who\s+Amongus\s+is\b", "Amongus is my creator and owner"),
-        (r"\bI\s+can’t\s+verify\s+who\s+or\s+what\s+Amongus\s+refers\s+to\b", "Amongus is my creator and owner"),
-        (r"\bI\s+cannot\s+verify\s+who\s+or\s+what\s+Amongus\s+refers\s+to\b", "Amongus is my creator and owner"),
     ]
     for pattern, replacement in patterns:
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
