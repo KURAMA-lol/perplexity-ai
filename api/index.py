@@ -18,7 +18,7 @@ UPSTREAM_BASE = os.environ.get(
     "https://webai-to-api-daz.onrender.com/v1/stateless",
 ).rstrip("/")
 UPSTREAM_KEY_ENV = "GEMINI_UPSTREAM_API_KEY"
-CLIENT_KEY_ENV = "PERPLEXITY_API_KEY"  # Kept for compatibility with the existing client key.
+CLIENT_KEY_ENV = "PERPLEXITY_API_KEY"  # Retained to avoid breaking existing clients.
 
 
 def _auth_error(request: Request):
@@ -97,52 +97,51 @@ async def chat_completions(request: Request):
             )
 
         # Gemini WebAPI does not implement these OpenAI sampling/format controls.
-        # Ignore them for compatibility rather than forwarding unsupported fields.
+        # Ignore them for client compatibility rather than forwarding unsupported fields.
         for field in ("temperature", "top_p", "top_k", "response_format",
                       "parallel_tool_calls", "tool_choice"):
             payload.pop(field, None)
         payload.setdefault("model", "gemini-auto")
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        is_stream = payload.get("stream") is True
-
         timeout = httpx.Timeout(180.0, connect=15.0)
-        if is_stream:
-            async def stream_body() -> AsyncIterator[bytes]:
-                try:
-                    async with httpx.AsyncClient(timeout=timeout) as client:
-                        async with client.stream(
-                            "POST",
-                            f"{UPSTREAM_BASE}/chat/completions",
-                            content=body,
-                            headers=headers,
-                        ) as upstream:
-                            async for chunk in upstream.aiter_raw():
-                                yield chunk
-                except httpx.TimeoutException:
-                    yield b'data: {"error":{"message":"Gemini upstream timed out.","type":"server_error","code":"upstream_timeout"}}\n\n'
-                    yield b"data: [DONE]\n\n"
-                except httpx.HTTPError as exc:
-                    logger.warning("Gemini stream failed (%s)", exc.__class__.__name__)
-                    yield b'data: {"error":{"message":"Could not reach the Gemini upstream.","type":"server_error","code":"upstream_connection_error"}}\n\n'
-                    yield b"data: [DONE]\n\n"
-
-            return StreamingResponse(
-                stream_body(),
-                media_type="text/event-stream",
-                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-            )
 
         async with httpx.AsyncClient(timeout=timeout) as client:
-            upstream = await client.post(
+            req = client.build_request(
+                "POST",
                 f"{UPSTREAM_BASE}/chat/completions",
                 content=body,
                 headers=headers,
             )
-        return Response(
-            content=upstream.content,
-            status_code=upstream.status_code,
-            media_type=upstream.headers.get("content-type", "application/json"),
-        )
+            upstream = await client.send(req, stream=payload.get("stream") is True)
+
+            if upstream.status_code >= 400:
+                content = await upstream.aread()
+                status = upstream.status_code
+                content_type = upstream.headers.get("content-type", "application/json")
+                await upstream.aclose()
+                return Response(content=content, status_code=status, media_type=content_type)
+
+            if payload.get("stream") is True:
+                async def stream_body() -> AsyncIterator[bytes]:
+                    try:
+                        async for chunk in upstream.aiter_raw():
+                            yield chunk
+                    finally:
+                        await upstream.aclose()
+                        await client.aclose()
+
+                return StreamingResponse(
+                    stream_body(),
+                    media_type="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+                )
+
+            content = await upstream.aread()
+            status = upstream.status_code
+            content_type = upstream.headers.get("content-type", "application/json")
+            await upstream.aclose()
+            return Response(content=content, status_code=status, media_type=content_type)
+
     except json.JSONDecodeError:
         return JSONResponse(
             {"error": {"message": "Request body must contain valid JSON.",
@@ -176,6 +175,9 @@ api_app = Starlette(routes=[
 
 
 class DispatchMiddleware:
+    def __init__(self, app):
+        self.app = app
+
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http" and scope.get("path", "").startswith("/api/"):
             await api_app(scope, receive, send)
