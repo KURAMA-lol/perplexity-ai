@@ -14,6 +14,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
+from starlette.routing import Route
 
 from perplexity.config import MODEL_MAPPINGS
 from perplexity.exceptions import AuthenticationError, RateLimitError
@@ -207,13 +208,16 @@ async def health(request: Request):
 
 
 api_app = Starlette(routes=[
-    __import__("starlette.routing", fromlist=["Route"]).Route("/api/v1/models", list_models, methods=["GET", "HEAD"]),
-    __import__("starlette.routing", fromlist=["Route"]).Route("/api/v1/chat/completions", chat_completions, methods=["POST"]),
-    __import__("starlette.routing", fromlist=["Route"]).Route("/api/v1/health", health, methods=["GET", "HEAD"]),
+    Route("/api/v1/models", list_models, methods=["GET", "HEAD"]),
+    Route("/api/v1/chat/completions", chat_completions, methods=["POST"]),
+    Route("/api/v1/health", health, methods=["GET", "HEAD"]),
 ])
 
 
-class CombinedApp:
+class DispatchMiddleware:
+    def __init__(self, app):
+        self.app = app
+
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
             path = scope.get("path", "")
@@ -236,7 +240,10 @@ class CombinedApp:
                                             headers={"WWW-Authenticate": "Bearer"})
                     await response(scope, receive, send)
                     return
-        await mcp_app(scope, receive, send)
+                await mcp_app(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
-app = CombinedApp()
+app = Starlette()
+app.add_middleware(DispatchMiddleware)
